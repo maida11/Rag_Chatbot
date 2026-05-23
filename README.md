@@ -6,8 +6,9 @@ A full-stack **Retrieval-Augmented Generation (RAG)** chatbot. Upload PDF, DOCX,
 
 - **Document upload** — Drag-and-drop or browse for PDF, DOCX, and TXT files
 - **Semantic search** — Chunks are embedded and stored in ChromaDB for similarity retrieval
-- **Grounded answers** — Groq (Llama 3.3 70B) answers only from retrieved context
-- **Chat UI** — React frontend with upload sidebar and conversational interface
+- **Grounded answers** — Groq (Llama 3.3 70B) answers using retrieved document chunks
+- **Context-aware chat** — Prior messages are sent with each question so follow-ups (e.g. “What about the second one?”) work naturally
+- **Chat UI** — React frontend with upload sidebar, message history, and conversational interface
 
 ## How it works
 
@@ -21,13 +22,31 @@ flowchart LR
   G --> E
   E --> H[Top-k chunks]
   H --> I[Groq LLM]
+  K[Chat history] --> I
   I --> J[Answer]
 ```
 
 1. **Ingest** — Text is extracted from the file, split into overlapping chunks (~400 characters), and embedded with `all-MiniLM-L6-v2`.
 2. **Store** — Chunks and embeddings are saved in a persistent ChromaDB collection (`chroma_db/`).
 3. **Query** — The user’s question is embedded; the top 5 similar chunks are retrieved.
-4. **Generate** — Retrieved text is passed as context to the LLM, which must answer from that context only.
+4. **Generate** — The LLM receives the retrieved chunks **plus the last 6 turns** of conversation history, so it can resolve follow-up questions that refer to earlier messages.
+
+## Conversation context
+
+The chatbot keeps **session-level context** for multi-turn conversations:
+
+| Layer | Behavior |
+| ----- | -------- |
+| **Frontend** (`ChatBox.jsx`) | Stores messages in React state and sends prior turns as `history` with each new `question`. The current question is sent separately and is not duplicated in `history`. |
+| **API** (`POST /chat/`) | Accepts `question` and optional `history` (list of `{ role, text }` objects). |
+| **LLM** (`llm.py`) | Formats the last 6 messages as `User:` / `Assistant:` lines and includes them in the prompt alongside retrieved document chunks. |
+
+**Example flow**
+
+1. User: *“What skills are listed in the resume?”* → RAG retrieves relevant chunks → bot answers.
+2. User: *“Which of those is mentioned first?”* → Frontend sends question #2 plus `history` from turn #1 → LLM uses both history and new retrieval to answer the follow-up.
+
+> History lives in the browser for the current session (refresh clears it). Document grounding still comes from ChromaDB on every request.
 
 ## Tech stack
 
@@ -148,8 +167,19 @@ file: <PDF | DOCX | TXT>
 POST /chat/
 Content-Type: application/json
 
-{ "question": "What does the document say about ...?" }
+{
+  "question": "Which of those is mentioned first?",
+  "history": [
+    { "role": "user", "text": "What skills are listed in the resume?" },
+    { "role": "bot", "text": "Python, FastAPI, and React." }
+  ]
+}
 ```
+
+| Field       | Type     | Required | Description |
+| ----------- | -------- | -------- | ----------- |
+| `question`  | string   | Yes      | Current user message |
+| `history`   | array    | No       | Prior turns (`role`: `"user"` or `"bot"`, `text`: message body). Defaults to `[]`. |
 
 **Response**
 
@@ -200,7 +230,8 @@ Other formats will return an error from the extractor.
 ## Notes
 
 - **Vector data** is stored under `backend/chroma_db/` when the server is run from `backend/`. Re-uploading documents adds new chunks; there is no delete endpoint yet.
-- **Context-only answers** — If the answer is not in the retrieved chunks, the model is instructed to say: *"The information is not available in the provided document."*
+- **Document grounding** — Answers should use retrieved chunks; if the answer is not in the document, the model is instructed to say it is outside the document scope.
+- **Follow-up questions** — Use conversation history for pronouns and references (“that”, “the second one”); each request still runs a fresh vector search on the current `question`.
 - **CORS** is open (`*`) for local development; tighten this before deploying to production.
 
 ## License

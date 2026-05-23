@@ -28,16 +28,13 @@ def process_file(file_path, filename):
     return doc_id
 
 
-def answer_question(question: str):
+def answer_question(question, history=None):
     query_embedding = generate_embedding(question)
-
     relevant_chunks = search(query_embedding)
-
     context = "\n".join(relevant_chunks)
-    answer = generate_answer(
-    question=question,
-    context=context,
-    chat_history=None
-)
 
-    return answer
+    return generate_answer(
+        question=question,
+        context=context,
+        chat_history=history or [],
+    )

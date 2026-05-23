@@ -14,14 +14,18 @@ export default function ChatBox() {
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
 
-    const userMsg = { role: "user", text: input };
+    const question = input.trim();
+    const userMsg = { role: "user", text: question };
+    const priorHistory = messages;
+
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
 
     try {
-      const res = await axios.post("http://127.0.0.1:8000/chat", {
-        question: input,
+      const res = await axios.post("http://127.0.0.1:8000/chat/", {
+        question,
+        history: priorHistory,
       });
       setMessages((prev) => [...prev, { role: "bot", text: res.data.answer }]);
     } catch {

@@ -11,24 +11,43 @@ llm = ChatGroq(
     model="llama-3.3-70b-versatile"
 )
 
+def _message_fields(msg):
+    if isinstance(msg, dict):
+        return msg.get("role", "user"), msg.get("text", "")
+    return getattr(msg, "role", "user"), getattr(msg, "text", "")
+
+
+def format_history(history):
+    if not history:
+        return ""
+
+    formatted = ""
+    for msg in history[-6:]:
+        role, text = _message_fields(msg)
+        label = "Assistant" if role in ("bot", "assistant") else "User"
+        formatted += f"{label}: {text}\n"
+
+    return formatted
+
 
 def generate_answer(question, context, chat_history=None):
-
+    formatted_history = format_history(chat_history or [])
     prompt = f"""
-You are a precise AI assistant working on a RAG system.
-
-RULES:
-1. Answer ONLY using the provided context.
-2. If the answer is not in the context, say: The information is not available in the provided document.
-3. Do NOT use outside knowledge.
-4. Be concise and professional.
-CONTEXT:
+You are a helpful AI assistant.
+Use the conversation history and retrieved context
+to answer follow-up questions naturally.
+Conversation History:
+{formatted_history}
+Retrieved Context:
 {context}
-CHAT HISTORY:
-{chat_history}
-QUESTION:
+Current Question:
 {question}
-FINAL ANSWER:
+Instructions:
+- Answer using the retrieved context
+- Use conversation history for follow-ups
+- If answer not found, say it is outside the document scope
+
+Answer:
 """
 
     response = llm.invoke(prompt)
