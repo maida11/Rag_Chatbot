@@ -3,14 +3,16 @@ venv/
 __pycache__/
 *.pyc
 
-# Environment
 .env
 
-# ChromaDB
 chroma/
 
-# Node
 node_modules/
 
-# OS
 .DS_Store
+
+uploads/
+
+test_rag.py
+
+chroma_db/
