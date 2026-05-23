@@ -13,9 +13,12 @@ def add_documents(doc_id: str, chunks: list, embeddings: list):
         )
 
 
-def search(query_embedding, k=3):
+def search(query_embedding, k=5):
     results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=k
-    )
-    return results["documents"][0]
+            query_embeddings=[query_embedding],
+            n_results=k
+        )
+
+    docs = results["documents"][0]
+    unique_docs = list(dict.fromkeys(docs))
+    return unique_docs

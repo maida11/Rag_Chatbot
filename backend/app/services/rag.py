@@ -1,9 +1,10 @@
 from app.services.file_extractor import extract_text
 from app.services.embeddings import generate_embedding
 from app.services.storage import add_documents, search
+from app.services.llm import generate_answer
 import uuid
 
-def chunk_text(text, chunk_size=1000, overlap=200):
+def chunk_text(text, chunk_size=400, overlap=50):
     chunks = []
     start = 0
 
@@ -28,10 +29,15 @@ def process_file(file_path, filename):
 
 
 def answer_question(question: str):
-    query_embedding = get_embedding(question)
+    query_embedding = generate_embedding(question)
 
     relevant_chunks = search(query_embedding)
 
     context = "\n".join(relevant_chunks)
+    answer = generate_answer(
+    question=question,
+    context=context,
+    chat_history=None
+)
 
-    return context
+    return answer
